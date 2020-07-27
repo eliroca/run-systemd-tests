@@ -2,6 +2,22 @@
 
 #set -x
 
+if [ "$1" == "--help" ]; then
+    echo "Running binary tests:"
+    echo "Usage: ./run-tests.sh [--skip=\$tests]"
+    echo "                    \$tests is a space separated list of test names"
+    echo "Running an extended test:"
+    echo "Usage: ./run-tests.sh TEST-XX-NAME --option"
+    echo " "
+    echo "Options:"
+    echo "--clean              cleanup before test"
+    echo "--setup              prepare test"
+    echo "--run                run test"
+    echo "--clean-again        cleanup after test"
+    echo "--all                clean, setup, run, clean-again for given test"
+    exit 0
+fi
+
 function cleanup {
 for id in 1 2 3; do
     [[ $(getent passwd systemdtestsuiteuser$id) ]] && userdel systemdtestsuiteuser$id
@@ -110,12 +126,6 @@ function summary {
     echo -e "See logs/\$testname.log\n"
 }
 
-
-if [ "$1" == "--help" ]; then
-    echo "Usage: ./run-tests.sh [--skip=\$tests]"
-    echo "       \$tests is a space separated list of test names"
-    exit 0
-fi
 
 [ -d logs ] || mkdir logs
 
