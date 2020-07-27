@@ -70,13 +70,13 @@ function cleanup {
     # done
 }
 
-function testsuiteprepare {
+function testsuite_prepare {
     VERSION=$(rpm -q systemd | sed -n 's/systemd-\([[:digit:]]*\).*/\1/p')
     echo "Preparing tests for version $VERSION"
     echo -e "\nChecking required packages\n"
 
     case "$VERSION" in
-        234|243|244|245)
+        234|243|244|245|246)
             ARCH=$(uname -m)
             case $ARCH in
                 x86_64|i*86)
@@ -94,20 +94,23 @@ function testsuiteprepare {
             esac
             progs="lz4 busybox dhcp-client python3 plymouth yast2-firstboot binutils netcat-openbsd cryptsetup less socat $QEMU_PKG"
             [[ $VERSION == 237 ]] && progs+=" ninja quota ppp"
+            [[ $VERSION == 246 ]] && progs+=" libcap-progs systemd-journal-remote"
             for prog in $progs; do
                 rpm -q $prog || zypper -n in --no-recommends "$prog"
                 [[ $? -ne 0 ]] && { echo "error installing required packages"; exit 1; }
             done
+            # some testcases in test-execute rely on existence of user groups with certain gids
+            # https://github.com/openSUSE/systemd/commit/ff5499824f96a7e7b93ca0b294eec62ad21e6592
             for id in 1 2 3; do
-                [[ $(getent group systemdtestsuitegroup$id) ]] || groupadd -g $id systemdtestsuitegroup$id
-                [[ $(getent passwd systemdtestsuiteuser$id) ]] || useradd -u $id -g $id systemdtestsuiteuser$id
+                groupadd -f -g $id systemdtestsuitegroup$id || :
             done
-            for user in systemd-journal-upload systemd-journal-remote; do
-                [[ $(getent passwd $user) ]] || useradd $user
-            done
-            for group in systemd-journal-upload systemd-journal-remote mail adm; do
-                [[ $(getent group $group) ]] || groupadd $group
-            done
+            # TODO: find out where exactly this part is needed and write short explanation here
+            # for user in systemd-journal-upload systemd-journal-remote; do
+            #     [[ $(getent passwd $user) ]] || useradd $user
+            # done
+            # for group in systemd-journal-upload systemd-journal-remote mail adm; do
+            #     [[ $(getent group $group) ]] || groupadd $group
+            # done
             [[ -d /var/opt/systemd-tests/test/sys ]] || /var/opt/systemd-tests/test/sys-script.py /var/opt/systemd-tests/test
             ;;
         228)
@@ -117,7 +120,6 @@ function testsuiteprepare {
             ;;
         *)
             echo "unknown systemd version: $VERSION"
-            cleanup
             exit 1
             ;;
     esac
@@ -125,6 +127,12 @@ function testsuiteprepare {
     #export testdata directory
     export SYSTEMD_TEST_DATA=/var/opt/systemd-tests/test
 
+    #add grub timeout to bootloader and make the reboot verbose
+    TIMEOUTSET=$(sed -n 's/GRUB_TIMEOUT=\(.*\)/\1/p' /etc/default/grub)
+    if [ "$TIMEOUTSET" != "5" ]; then
+        sed -i 's/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub
+        grub2-mkconfig -o /boot/grub2/grub.cfg || return 1
+    fi
     #create input files for test-catalog
     [[ -d /var/opt/systemd-tests/catalog ]] || ln -s /usr/lib/systemd/catalog /var/opt/systemd-tests/
     # only for tests running qemu
@@ -134,13 +142,6 @@ function testsuiteprepare {
 
 if [[ -z "$2" || "$2" == "--setup" ]]; then
     testsuiteprepare
-
-    #add grub timeout to bootloader and make the rebote verbose
-    TIMEOUTSET=$(sed -n 's/GRUB_TIMEOUT=\(.*\)/\1/p' /etc/default/grub)
-    if [ "$TIMEOUTSET" != "5" ]; then
-        sed -i 's/GRUB_TIMEOUT=.*/GRUB_TIMEOUT=5/' /etc/default/grub
-        grub2-mkconfig -o /boot/grub2/grub.cfg || return 1
-    fi
 fi
 
 if [ -z "$1" ]; then
