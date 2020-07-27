@@ -18,17 +18,56 @@ if [ "$1" == "--help" ]; then
     exit 0
 fi
 
+[ -d logs ] || mkdir logs
+export TEST_BASE_DIR='/var/opt/systemd-tests/test'
+
+function binary_tests_summary {
+    ws='[   ]'
+    results=$(echo logs/*.trs)
+    [[ -n "$results" ]] || results=/dev/null
+    all=`grep "^$ws*:test-result:" $results | wc -l`
+    pass=`grep "^$ws*:test-result:$ws*PASS" $results | wc -l`
+    fail=`grep "^$ws*:test-result:$ws*FAIL" $results | wc -l`
+    skip=`grep "^$ws*:test-result:$ws*SKIP" $results | wc -l`
+    xfail=`grep "^$ws*:test-result:$ws*XFAIL" $results | wc -l`
+    xpass=`grep "^$ws*:test-result:$ws*XPASS" $results | wc -l`
+    error=`grep "^$ws*:test-result:$ws*ERROR" $results | wc -l`
+    if [ $(expr $fail + $xpass + $error) -eq 0 ]; then
+        success=0;
+    else
+        success=1;\
+    fi
+
+    echo "============================================================"
+    echo "Binary tests summary for systemd $VERSION"
+    echo "============================================================"
+    echo -e "# TOTAL: $all"
+    echo -e '\033[0;32m'"# PASS:  $pass"
+    echo -e '\033[1;34m'"# SKIP:  $skip"
+    #echo -e '\033[m'"# XFAIL: $xfail"
+    echo -e '\033[0;31m'"# FAIL:  $fail"
+    #echo -e '\033[m'"# XPASS: $xpass"
+    echo -e '\033[m'"# ERROR: $error"
+    echo "============================================================"
+    echo -e "See logs/\$testname.log\n"
+    exit $success
+}
+
 function cleanup {
-for id in 1 2 3; do
-    [[ $(getent passwd systemdtestsuiteuser$id) ]] && userdel systemdtestsuiteuser$id
-    [[ $(getent group systemdtestsuitegroup$id) ]] && groupdel systemdtestsuitegroup$id
-done
-for user in systemd-journal-upload systemd-journal-remote; do
-    [[ $(getent passwd $user) ]] && userdel $user
-done
-for group in systemd-journal-upload systemd-journal-remote mail adm; do
-    [[ $(getent group $group) ]] && groupdel $group
-done
+    for id in 1 2 3; do
+        [[ $(getent group systemdtestsuitegroup$id) ]] && groupdel systemdtestsuitegroup$id || :
+    done
+    # TODO: find out where exactly this part is needed and write short explanation here
+    # for id in 1 2 3; do
+    #     [[ $(getent passwd systemdtestsuiteuser$id) ]] && userdel systemdtestsuiteuser$id
+    #     [[ $(getent group systemdtestsuitegroup$id) ]] && groupdel systemdtestsuitegroup$id
+    # done
+    # for user in systemd-journal-upload systemd-journal-remote; do
+    #     [[ $(getent passwd $user) ]] && userdel $user
+    # done
+    # for group in systemd-journal-upload systemd-journal-remote mail adm; do
+    #     [[ $(getent group $group) ]] && groupdel $group
+    # done
 }
 
 function testsuiteprepare {
@@ -83,7 +122,6 @@ function testsuiteprepare {
             ;;
     esac
 
-    echo ""
     #export testdata directory
     export SYSTEMD_TEST_DATA=/var/opt/systemd-tests/test
 
@@ -92,42 +130,6 @@ function testsuiteprepare {
     # only for tests running qemu
     # for i in $(ls /var/opt/systemd-tests/catalog/systemd.*.in); do mv $i ${i%%.in}; done
 }
-
-
-function summary {
-    ws='[   ]'
-    results=$(echo logs/*.trs)
-    [[ -n "$results" ]] || results=/dev/null
-    all=`grep "^$ws*:test-result:" $results | wc -l`
-    pass=`grep "^$ws*:test-result:$ws*PASS" $results | wc -l`
-    fail=`grep "^$ws*:test-result:$ws*FAIL" $results | wc -l`
-    skip=`grep "^$ws*:test-result:$ws*SKIP" $results | wc -l`
-    xfail=`grep "^$ws*:test-result:$ws*XFAIL" $results | wc -l`
-    xpass=`grep "^$ws*:test-result:$ws*XPASS" $results | wc -l`
-    error=`grep "^$ws*:test-result:$ws*ERROR" $results | wc -l`
-    if [ $(expr $fail + $xpass + $error) -eq 0 ]; then
-      success=0;
-    else
-      success=1;\
-    fi
-
-    echo
-    echo "============================================================================"
-    echo "Testsuite summary for systemd $VERSION"
-    echo "============================================================================"
-    echo -e "# TOTAL: $all"
-    echo -e '\033[0;32m'"# PASS:  $pass"
-    echo -e '\033[1;34m'"# SKIP:  $skip"
-    #echo -e '\033[m'"# XFAIL: $xfail"
-    echo -e '\033[0;31m'"# FAIL:  $fail"
-    #echo -e '\033[m'"# XPASS: $xpass"
-    echo -e '\033[m'"# ERROR: $error"
-    echo "============================================================================"
-    echo -e "See logs/\$testname.log\n"
-}
-
-
-[ -d logs ] || mkdir logs
 
 
 if [[ -z "$2" || "$2" == "--setup" ]]; then
@@ -175,7 +177,6 @@ if [ -z "$1" ]; then
 else
     #route package not available in openSUSE
     sed -i 's/route //' test/test-functions
-    export TEST_BASE_DIR='/var/opt/systemd-tests/test'
     TESTDIR='none'
     if [ "$1" == "--all" ]; then
         echo -e "\nrunning all extended tests\n"
