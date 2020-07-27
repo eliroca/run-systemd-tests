@@ -139,42 +139,52 @@ function testsuite_prepare {
     # for i in $(ls /var/opt/systemd-tests/catalog/systemd.*.in); do mv $i ${i%%.in}; done
 }
 
+function run_binary_tests {
+    testsuite_prepare
+
+    testlist=$(echo test-*)" "
+    testlist+="test/udev-test.pl test/hwdb-test.sh test/rule-syntax-check.py hwdb.d/parse_hwdb.py test/sysv-generator-test.py"
+
+    skiplist="test-coredump-vacuum test-qcow2 test-patch-uid test-ns test-hostname test-ask-password-api test-dissect-image test-ipcrm test-btrfs test-netlink-manual test-cgroup test-install test-udev test-nss test-bus-benchmark test-ipv4ll-manual test-acd test-inhibit "
+    skiplist+="*.sh test-driver "
+
+    for testtoskip in $@; do
+        for test in $testlist; do
+            if [[ "$testtoskip" == "$test" ]]; then
+                skiplist+=" $testtoskip"
+                foundtesttoskip=true
+                break
+            fi
+        done
+        if [[ -z "$foundtesttoskip" ]]; then
+            echo "test to skip not found: $testtoskip"
+        fi
+    done
+
+    echo -e "\nRunning binary tests"
+    echo -e "============================================================\n"
+
+    [[ -f /proc/sys/kernel/nmi_watchdog ]] && WD=$(cat /proc/sys/kernel/nmi_watchdog)
+    [[ "$WD" == 1 ]] && echo 0 > /proc/sys/kernel/nmi_watchdog
+
+    for test in $testlist; do
+        for skip in $skiplist; do
+            [[ $test == $skip ]] && continue 2;
+        done
+        [[ "$test" == "test/rule-syntax-check.py" ]] && testname=rule-syntax-check-run.sh || testname=$test
+        ./test-driver --test-name $testname --log-file logs/${test#*/}.log --trs-file logs/${test#*/}.trs --color-tests yes
+    done
+}
+
 
 if [[ -z "$2" || "$2" == "--setup" ]]; then
     testsuiteprepare
 fi
 
 if [ -z "$1" ]; then
-    testfiles=$(echo test-*)" "
-    testfiles+="test/udev-test.pl
-    test/hwdb-test.sh
-    test/rule-syntax-check.py
-    hwdb.d/parse_hwdb.py
-    test/sysv-generator-test.py"
-
-    skiptests="test-coredump-vacuum test-qcow2 test-patch-uid test-ns test-hostname test-ask-password-api test-dissect-image test-ipcrm test-btrfs test-netlink-manual test-cgroup test-install test-udev test-nss test-bus-benchmark test-ipv4ll-manual test-acd test-inhibit "
-    skiptests+="*.sh test-driver "
-
-    for toskip in ${@##--skip=}; do
-        [[ "$testfiles" =~ "$toskip" ]] && skiptests+=" $toskip"
-    done
-
-    echo -e "\nrunning basic tests\n"
-
-    [[ -f /proc/sys/kernel/nmi_watchdog ]] && WD=$(cat /proc/sys/kernel/nmi_watchdog)
-    [[ "$WD" == 1 ]] && echo 0 > /proc/sys/kernel/nmi_watchdog
-
-    for test in $testfiles; do
-        for skip in $skiptests; do
-            [[ $skip == $test ]] && continue 2;
-        done
-        [[ "$test" == "test/rule-syntax-check.py" ]] && testname=rule-syntax-check-run.sh || testname=$test
-        ./test-driver --test-name $testname --log-file logs/${test#*/}.log --trs-file logs/${test#*/}.trs --color-tests yes
-    done
-
-    summary
+    run_binary_tests
     cleanup
-    exit $success
+    binary_tests_summary
 else
     #route package not available in openSUSE
     sed -i 's/route //' test/test-functions
