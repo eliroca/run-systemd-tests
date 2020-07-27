@@ -176,80 +176,64 @@ function run_binary_tests {
     done
 }
 
+function check_extended_test {
+    testname=$(basename $dir)
+    TESTDIR=$(sed -n '/systemd-test.*system.journal/s/.*\(systemd-test.[[:alnum:]]*\)\/.*/\1/p' ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
+    TESTRES=$(grep "$testname RUN: .* \[OK\]" ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
+    if [[ -n $TESTRES ]]; then
+        TESTRES='\033[0;32m'"PASS"
+    else
+        TESTRES='\033[0;31m'"FAIL"
+    fi
+    echo -e "\n$TESTRES:" '\033[m'"$testname"
+    echo ":test-result: ${TESTRES##*m}" > ${TEST_BASE_DIR%%/test}/logs/$testname.trs
+    [[ "$TESTRES" =~ "PASS" ]] && [[ -n "$TESTDIR" ]] && rm -rf /var/tmp/$TESTDIR &>/dev/null
+    # only needed for qemu
+    # losetup -d
+}
 
-if [[ -z "$2" || "$2" == "--setup" ]]; then
-    testsuiteprepare
-fi
+function run_extended_test {
+    if [ $2 == "--setup" ]; then
+        testsuite_prepare
+    fi
+    dir="$TEST_BASE_DIR/$1"
+    cd "$dir"
+    # if [ $1 == "TEST-16-EXTEND-TIMEOUT" ]; then
+    #     sed -i '/SKIP_INITRD=yes/d' test.sh
+    # fi
+    echo -e "\nRunning extended test: $1 $2"
+    echo -e "============================================================\n"
+    ./test.sh $2 2>&1>> ${TEST_BASE_DIR%%/test}/logs/$1-${2#--}.log
+    if [ "$2" == "--run" ]; then
+        check_extended_test
+    fi
+}
 
-if [ -z "$1" ]; then
-    run_binary_tests
+options=(--clean --setup --run --clean-again)
+
+if [[ -z "$1" || $1 =~ "--skip" ]]; then
+    run_binary_tests ${@##--skip=}
     cleanup
     binary_tests_summary
-else
-    #route package not available in openSUSE
-    sed -i 's/route //' test/test-functions
-    TESTDIR='none'
-    if [ "$1" == "--all" ]; then
-        echo -e "\nrunning all extended tests\n"
-        for dir in $(echo test/TEST-*); do
-            [[ "$dir" == "test/TEST-06-SELINUX" ]] && continue
-            cd $dir
-            sed -i '/SKIP_INITRD=yes/d' test.sh
-            testname=$(basename $dir)
-            ./test.sh --clean &> /dev/null
-            ./test.sh --setup &> ${TEST_BASE_DIR%%/test}/logs/$testname-setup.log
-            [[ $? == 0 ]] && ./test.sh --run &> ${TEST_BASE_DIR%%/test}/logs/$testname-run.log
-        done
-    else
-        echo -e "\nRunning extended tests"
-        echo -e "======================\n"
-        dir="test/$1"
-        cd "$dir"
-        sed -i '/SKIP_INITRD=yes/d' test.sh
-        testname=$(basename $dir)
-        if [[ -n "$1" && -z "$2" ]]; then
-            if [ "$1" == "TEST-01-BASIC" ]; then
-                ./test.sh --clean &> /dev/null
-                ./test.sh --setup &> ${TEST_BASE_DIR%%/test}/logs/$testname-setup.log
-            fi
-            ./test.sh --run &> ${TEST_BASE_DIR%%/test}/logs/$testname-run.log
-        elif [[ -n "$1" && -n "$2" ]]; then
-            echo -e "Running $1 $2\n"
-            ./test.sh $2 2>&1>> ${TEST_BASE_DIR%%/test}/logs/$testname-${2#--}.log
-        else
-            echo "INVALID PARAMETERS"
-            exit 1
-        fi
 
-        if [[ -z "$2" || "$2" == "--run" ]]; then
-            TESTDIR=$(sed -n '/systemd-test.*system.journal/s/.*\(systemd-test.[[:alnum:]]*\)\/.*/\1/p' ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
-            echo -e "\ntestresult:"
-            for file in $(ls /failed* 2>/dev/null); do
-                echo "$file: $(cat $file)"
-            done
-            for file in $(ls /testok* 2>/dev/null); do
-                content=$(cat $file)
-                RESULT+=$content
-                echo "$file: $content"
-            done
-            if [[ "${RESULT:9:2}" == "OK" ]]; then
-                TESTRES='\033[0;32m'"PASS"
-            else
-                TESTRES='\033[0;31m'"FAIL"
-            fi
-            echo -e "\n$TESTRES:" '\033[m'"$testname"
-            echo ":test-result: ${TESTRES##*m}" > ${TEST_BASE_DIR%%/test}/logs/$testname.trs
-            [[ "$TESTRES" =~ "PASS" ]] && [[ -n "$TESTDIR" ]] && rm -rf /var/tmp/$TESTDIR &>/dev/null
-            cd ${TEST_BASE_DIR%%/test}
-            # only needed for qemu
-            # losetup -d
+elif [[ -n "$1" && "$2" == "--all" ]]; then
+    for opt in "${options[@]}"; do
+        run_extended_test $1 $opt
+    done
+    cleanup
+
+elif [[ -n "$1" && -n "$2" ]]; then
+    for opt in "${options[@]}"; do
+        if [[ "$opt" == "$2" ]]; then
+            run_extended_test $1 $2
             cleanup
+            exit 0
         fi
+    done
+    echo -e "Invalid option: $2\nsee './run-tests.sh --help'"
+    exit 1
 
-        if [[ -z "$2" ]]; then
-            summary
-        fi
-    fi
+else
+    echo "Invalid/missing parameters, see './run-tests.sh --help'"
+    exit 1
 fi
-
-exit $success
