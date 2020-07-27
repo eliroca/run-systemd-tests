@@ -171,7 +171,19 @@ function run_binary_tests {
         for skip in $skiplist; do
             [[ $test == $skip ]] && continue 2;
         done
-        [[ "$test" == "test/rule-syntax-check.py" ]] && testname=rule-syntax-check-run.sh || testname=$test
+        testname=$test
+        if [[ "$test" == "test/rule-syntax-check.py" ]]; then
+            testname="rule-syntax-check.sh"
+            cat > $testname << EOF
+#!/bin/sh
+
+RULES=\$(find /var/opt/systemd-tests/rules.d -name *.rules)
+RULES+=" "\$(find /var/opt/systemd-tests/rules.d -name *.rules.in)
+
+./test/rule-syntax-check.py \$RULES
+EOF
+        chmod +x $testname
+        fi
         ./test-driver --test-name $testname --log-file logs/${test#*/}.log --trs-file logs/${test#*/}.trs --color-tests yes
     done
 }
