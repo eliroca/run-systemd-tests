@@ -57,15 +57,12 @@ function cleanup {
     for id in 1 2 3; do
         [[ $(getent group systemdtestsuitegroup$id) ]] && groupdel systemdtestsuitegroup$id || :
     done
+    [[ $(getent group adm) ]] && groupdel adm || :
     # TODO: find out where exactly this part is needed and write short explanation here
-    # for id in 1 2 3; do
-    #     [[ $(getent passwd systemdtestsuiteuser$id) ]] && userdel systemdtestsuiteuser$id
-    #     [[ $(getent group systemdtestsuitegroup$id) ]] && groupdel systemdtestsuitegroup$id
-    # done
     # for user in systemd-journal-upload systemd-journal-remote; do
     #     [[ $(getent passwd $user) ]] && userdel $user
     # done
-    # for group in systemd-journal-upload systemd-journal-remote mail adm; do
+    # for group in systemd-journal-upload systemd-journal-remote mail; do
     #     [[ $(getent group $group) ]] && groupdel $group
     # done
 }
@@ -104,11 +101,13 @@ function testsuite_prepare {
             for id in 1 2 3; do
                 groupadd -f -g $id systemdtestsuitegroup$id || :
             done
+            # needed in TEST-12-ISSUE-3171
+            [[ $(getent group adm) ]] || groupadd adm
             # TODO: find out where exactly this part is needed and write short explanation here
             # for user in systemd-journal-upload systemd-journal-remote; do
             #     [[ $(getent passwd $user) ]] || useradd $user
             # done
-            # for group in systemd-journal-upload systemd-journal-remote mail adm; do
+            # for group in systemd-journal-upload systemd-journal-remote mail; do
             #     [[ $(getent group $group) ]] || groupadd $group
             # done
             [[ -d /var/opt/systemd-tests/test/sys ]] || /var/opt/systemd-tests/test/sys-script.py /var/opt/systemd-tests/test
