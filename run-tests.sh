@@ -185,6 +185,7 @@ EOF
         fi
         ./test-driver --test-name $testname --log-file logs/${test#*/}.log --trs-file logs/${test#*/}.trs --color-tests yes
     done
+    cleanup
 }
 
 function check_extended_test {
@@ -217,6 +218,8 @@ function run_extended_test {
     ./test.sh $2 2>&1>> ${TEST_BASE_DIR%%/test}/logs/$1-${2#--}.log
     if [ "$2" == "--run" ]; then
         check_extended_test
+    elif [[ "$2" == "--clean" ]]; then
+        cleanup
     fi
 }
 
@@ -224,20 +227,17 @@ options=(--clean --setup --run --clean-again)
 
 if [[ -z "$1" || $1 =~ "--skip" ]]; then
     run_binary_tests ${@##--skip=}
-    cleanup
     binary_tests_summary
 
 elif [[ -n "$1" && "$2" == "--all" ]]; then
     for opt in "${options[@]}"; do
         run_extended_test $1 $opt
     done
-    cleanup
 
 elif [[ -n "$1" && -n "$2" ]]; then
     for opt in "${options[@]}"; do
         if [[ "$opt" == "$2" ]]; then
             run_extended_test $1 $2
-            cleanup
             exit 0
         fi
     done
