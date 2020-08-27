@@ -193,8 +193,14 @@ EOF
 
 function check_extended_test {
     testname=$(basename $dir)
-    TESTDIR=$(sed -n '/systemd-test.*system.journal/s/.*\(systemd-test.[[:alnum:]]*\)\/.*/\1/p' ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
-    TESTRES=$(grep "$testname RUN: .* \[OK\]" ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
+    test_output=""
+    VERSION=$(rpm -q systemd | sed -n 's/systemd-\([[:digit:]]*\).*/\1/p')
+    if [[ $VERSION == "246" ]]; then
+        test_output="${testname} RUN:"
+    else
+        test_output="TEST RUN:"
+    fi
+    TESTRES=$(grep "${test_output} .* \[OK\]" ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
     if [[ -n $TESTRES ]]; then
         TESTRES='\033[0;32m'"PASS"
     else
@@ -202,6 +208,7 @@ function check_extended_test {
     fi
     echo -e "\n$TESTRES:" '\033[m'"$testname"
     echo ":test-result: ${TESTRES##*m}" > ${TEST_BASE_DIR%%/test}/logs/$testname.trs
+    TESTDIR=$(sed -n '/systemd-test.*system.journal/s/.*\(systemd-test.[[:alnum:]]*\)\/.*/\1/p' ${TEST_BASE_DIR%%/test}/logs/$testname-run.log)
     [[ "$TESTRES" =~ "PASS" ]] && [[ -n "$TESTDIR" ]] && rm -rf /var/tmp/$TESTDIR &>/dev/null
     # only needed for qemu
     # losetup -d
