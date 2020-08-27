@@ -3,6 +3,9 @@
 #set -x
 
 if [ "$1" == "--help" ]; then
+    echo "Running testsuite preparation:"
+    echo "Usage: ./run-tests.sh --prepare"
+    echo " "
     echo "Running binary tests:"
     echo "Usage: ./run-tests.sh [--skip=\$tests]"
     echo "                    \$tests is a space separated list of test names"
@@ -228,6 +231,9 @@ test_options=(--clean --setup --run --clean-again)
 if [[ -z "$1" || $1 =~ "--skip" ]]; then
     run_binary_tests ${@##--skip=}
     binary_tests_summary
+
+elif [[ $1 =~ "--prepare" ]]; then
+    testsuite_prepare
 
 elif [[ -n "$1" && "$2" == "--all" ]]; then
     for opt in "${test_options[@]}"; do
