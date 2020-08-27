@@ -7,7 +7,7 @@ if [ "$1" == "--help" ]; then
     echo "Usage: ./run-tests.sh [--skip=\$tests]"
     echo "                    \$tests is a space separated list of test names"
     echo "Running an extended test:"
-    echo "Usage: ./run-tests.sh TEST-XX-NAME --option"
+    echo "Usage: ./run-tests.sh TEST-XX-NAME --\$option"
     echo " "
     echo "Options:"
     echo "--clean              cleanup before test"
@@ -223,19 +223,19 @@ function run_extended_test {
     fi
 }
 
-options=(--clean --setup --run --clean-again)
+test_options=(--clean --setup --run --clean-again)
 
 if [[ -z "$1" || $1 =~ "--skip" ]]; then
     run_binary_tests ${@##--skip=}
     binary_tests_summary
 
 elif [[ -n "$1" && "$2" == "--all" ]]; then
-    for opt in "${options[@]}"; do
+    for opt in "${test_options[@]}"; do
         run_extended_test $1 $opt
     done
 
 elif [[ -n "$1" && -n "$2" ]]; then
-    for opt in "${options[@]}"; do
+    for opt in "${test_options[@]}"; do
         if [[ "$opt" == "$2" ]]; then
             run_extended_test $1 $2
             exit 0
