@@ -1,5 +1,5 @@
 # run-systemd-tests
-Script to run systemd's testsuite
+Script to run systemd's testsuite, included in the testsuite package: https://build.opensuse.org/package/show/devel:openSUSE:QA:Tumbleweed/systemd-v245-testsuite
 
 ```
  ./run-tests.sh --help
